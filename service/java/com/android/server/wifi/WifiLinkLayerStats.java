@@ -78,6 +78,15 @@ public class WifiLinkLayerStats {
     /** WME Voice Access Category number of transmission retries */
     public long retries_vo;
 
+    /** WME Best Effort Access Category contention time */
+    public int contention_atime_be;
+    /** WME Background Access Category contention time */
+    public int contention_atime_bk;
+    /** WME Video Access Category contention time */
+    public int contention_atime_vi;
+    /** WME Voice Access Category contention time */
+    public int contention_atime_vo;
+
     /**
      * Cumulative milliseconds when radio is awake
      */

@@ -975,21 +975,27 @@ public class WifiVendorHal {
         stats.txmpdu_be = iface.wmeBePktStats.txMpdu;
         stats.lostmpdu_be = iface.wmeBePktStats.lostMpdu;
         stats.retries_be = iface.wmeBePktStats.retries;
+        // Each packet statistics entry carries the contention time of all four access
+        // categories; the Best Effort entry is used for all of them.
+        stats.contention_atime_be = iface.wmeBePktStats.contention_atime_be;
         // WME Background Access Category
         stats.rxmpdu_bk = iface.wmeBkPktStats.rxMpdu;
         stats.txmpdu_bk = iface.wmeBkPktStats.txMpdu;
         stats.lostmpdu_bk = iface.wmeBkPktStats.lostMpdu;
         stats.retries_bk = iface.wmeBkPktStats.retries;
+        stats.contention_atime_bk = iface.wmeBePktStats.contention_atime_bk;
         // WME Video Access Category
         stats.rxmpdu_vi = iface.wmeViPktStats.rxMpdu;
         stats.txmpdu_vi = iface.wmeViPktStats.txMpdu;
         stats.lostmpdu_vi = iface.wmeViPktStats.lostMpdu;
         stats.retries_vi = iface.wmeViPktStats.retries;
+        stats.contention_atime_vi = iface.wmeBePktStats.contention_atime_vi;
         // WME Voice Access Category
         stats.rxmpdu_vo = iface.wmeVoPktStats.rxMpdu;
         stats.txmpdu_vo = iface.wmeVoPktStats.txMpdu;
         stats.lostmpdu_vo = iface.wmeVoPktStats.lostMpdu;
         stats.retries_vo = iface.wmeVoPktStats.retries;
+        stats.contention_atime_vo = iface.wmeBePktStats.contention_atime_vo;
     }
 
     private static void setRadioStats(WifiLinkLayerStats stats,
