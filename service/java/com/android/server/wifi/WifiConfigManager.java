@@ -42,6 +42,7 @@ import android.os.Looper;
 import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.pico.utils.Features;
 import android.provider.Settings;
 import android.telephony.TelephonyManager;
 import android.text.TextUtils;
@@ -458,11 +459,16 @@ public class WifiConfigManager {
                             mDeviceConfigFacade.getRandomizationFlakySsidHotlist();
                 });
         mRandomizationFlakySsidHotlist = mDeviceConfigFacade.getRandomizationFlakySsidHotlist();
-        try {
-            mSystemUiUid = mContext.getPackageManager().getPackageUidAsUser(SYSUI_PACKAGE_NAME,
-                    PackageManager.MATCH_SYSTEM_ONLY, UserHandle.USER_SYSTEM);
-        } catch (PackageManager.NameNotFoundException e) {
-            Log.e(TAG, "Unable to resolve SystemUI's UID.");
+        // PICO: skip the SystemUI UID lookup when Features.disableSystemUI() (always true on
+        // PICO OS); mSystemUiUid then stays -1.
+        if (!Features.disableSystemUI()) {
+            try {
+                mSystemUiUid = mContext.getPackageManager().getPackageUidAsUser(
+                        SYSUI_PACKAGE_NAME, PackageManager.MATCH_SYSTEM_ONLY,
+                        UserHandle.USER_SYSTEM);
+            } catch (PackageManager.NameNotFoundException e) {
+                Log.e(TAG, "Unable to resolve SystemUI's UID.");
+            }
         }
         mMacAddressUtil = mWifiInjector.getMacAddressUtil();
     }
