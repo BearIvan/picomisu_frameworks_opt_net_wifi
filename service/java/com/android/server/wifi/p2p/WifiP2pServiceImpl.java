@@ -123,6 +123,9 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
     private static final String TAG = "WifiP2pService";
     private boolean mVerboseLoggingEnabled = false;
     private static final String NETWORKTYPE = "WIFI_P2P";
+    // PICO: Settings.System switch; 1 accepts PBC/no-PIN negotiation requests without the
+    // invitation dialog.
+    private static final String P2P_ACCEPT_INVITATION = "wifi_p2p_invitation_auto_accept";
 
     private Context mContext;
 
@@ -2243,7 +2246,13 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 if (mVerboseLoggingEnabled) logd(getName());
                 if (mSavedPeerConfig.wps.setup == WpsInfo.PBC
                             || TextUtils.isEmpty(mSavedPeerConfig.wps.pin)) {
-                    notifyInvitationReceived();
+                    int autoAccept = Settings.System.getInt(mContext.getContentResolver(),
+                            P2P_ACCEPT_INVITATION, 0);
+                    if (autoAccept == 1) {
+                        sendMessage(PEER_CONNECTION_USER_ACCEPT);
+                    } else {
+                        notifyInvitationReceived();
+                    }
                 }
             }
 
