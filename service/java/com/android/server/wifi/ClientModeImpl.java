@@ -341,6 +341,16 @@ public class ClientModeImpl extends StateMachine {
     /** 1 when the swift link is connected, 0 otherwise. */
     public static final String EXTRA_STATE_SWIFT = "com.pvr.btperipheral.adapter.extra.STATE";
 
+    /** PICO: sent when the association moves to another 2.4 GHz frequency. */
+    private static final String ACTION_ROAM_FREQUENCY_CHANGED =
+            "android.net.wifi.ROAM_FREQUENCY_CHANGED";
+    /**
+     * PICO: vendor property read by the PICO vendor nds daemon; "1" once IPv4 is
+     * provisioned, "0" when leaving L2ConnectedState. Labelled customize_prop by the
+     * factory vendor policy, which lets system_server set it.
+     */
+    private static final String PROP_NDS_WIFI_CONNECTED = "vendor.nds.wificonnected";
+
     /**
      * The link properties of the wifi interface.
      * Do not modify this directly; use updateLinkProperties instead.
@@ -2943,6 +2953,7 @@ public class ClientModeImpl extends StateMachine {
             mWifiInfo.setRxLinkSpeedMbps(newRxLinkSpeed);
         }
         if (newFrequency > 0) {
+            sendBroadcastRoamUpdateFrequency(newFrequency);
             updateConnectedBand(newFrequency, true);
         }
         mWifiConfigManager.updateScanDetailCacheFromWifiInfo(mWifiInfo);
@@ -3023,6 +3034,19 @@ public class ClientModeImpl extends StateMachine {
         intent.putExtra(WifiManager.EXTRA_NEW_RSSI, newRssi);
         mContext.sendBroadcastAsUser(intent, UserHandle.ALL,
                 android.Manifest.permission.ACCESS_WIFI_STATE);
+    }
+
+    /**
+     * PICO: tell listeners that the association moved to another 2.4 GHz frequency
+     * (android.net.wifi.ROAM_FREQUENCY_CHANGED, no extras).
+     */
+    private void sendBroadcastRoamUpdateFrequency(int newFrequency) {
+        if (newFrequency != mWifiInfo.getFrequency() && ScanResult.is24GHz(newFrequency)) {
+            Intent intent = new Intent(ACTION_ROAM_FREQUENCY_CHANGED);
+            intent.addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);
+            mContext.sendBroadcastAsUser(intent, UserHandle.ALL,
+                    android.Manifest.permission.ACCESS_WIFI_STATE);
+        }
     }
 
     private void sendNetworkStateChangeBroadcast(String bssid) {
@@ -3505,6 +3529,8 @@ public class ClientModeImpl extends StateMachine {
             logd("handleIPv4Success <" + dhcpResults.toString() + ">");
             logd("link address " + dhcpResults.ipAddress);
         }
+
+        SystemProperties.set(PROP_NDS_WIFI_CONNECTED, "1");
 
         Inet4Address addr;
         synchronized (mDhcpResultsLock) {
@@ -5596,6 +5622,11 @@ public class ClientModeImpl extends StateMachine {
             //Inform WifiLockManager
             WifiLockManager wifiLockManager = mWifiInjector.getWifiLockManager();
             wifiLockManager.updateWifiClientConnected(false);
+
+            // PICO: the factory ConnectivityService publishes the Wi-Fi default gateway in
+            // net.gateway; reset it together with the nds connected flag.
+            SystemProperties.set(PROP_NDS_WIFI_CONNECTED, "0");
+            SystemProperties.set("net.gateway", "0");
         }
 
         @Override
