@@ -160,6 +160,9 @@ public class WifiServiceImpl extends BaseWifiService {
     private static final String TAG = "WifiService";
     private static final boolean VDBG = false;
 
+    // PICO: Settings.Global key holding the package that last toggled Wi-Fi.
+    private static final String PVR_WIFI_STATE_CHANGED_BY_WHO = "pvr_wifi_state_changed_by_who";
+
     // Default scan background throttling interval if not overriden in settings
     private static final long DEFAULT_SCAN_BACKGROUND_THROTTLE_INTERVAL_MS = 30 * 60 * 1000;
 
@@ -631,6 +634,11 @@ public class WifiServiceImpl extends BaseWifiService {
         Slog.i(TAG, "WifiService starting up with Wi-Fi " +
                 (wifiEnabled ? "enabled" : "disabled"));
 
+        // PICO: do not turn Wi-Fi on at boot while the customer switch disables it.
+        if (!mSettingsStore.isWifiFeatureEnabledForCustomer()) {
+            wifiEnabled = false;
+        }
+        registerForCustomerWifiFeatureModeChange();
         registerForScanModeChange();
         mContext.registerReceiver(
                 new BroadcastReceiver() {
@@ -983,6 +991,12 @@ public class WifiServiceImpl extends BaseWifiService {
         if (enforceChangePermission(packageName) != MODE_ALLOWED) {
             return false;
         }
+        // PICO: nobody may turn Wi-Fi on while the customer switch disables it.
+        if (enable && !mSettingsStore.isWifiFeatureEnabledForCustomer()) {
+            mLog.info("setWifiEnabled not allowed as Wifi feature had been disabled by "
+                    + "Customer!!!").flush();
+            return false;
+        }
         boolean isPrivileged = isPrivileged(Binder.getCallingPid(), Binder.getCallingUid());
         if (!isPrivileged && !isDeviceOrProfileOwner(Binder.getCallingUid())
                 && !mWifiPermissionsUtil.isTargetSdkLessThan(packageName, Build.VERSION_CODES.Q,
@@ -1040,6 +1054,7 @@ public class WifiServiceImpl extends BaseWifiService {
            return false;
         }
 
+        savePackageControlWifiSate(packageName, enable);
         return true;
     }
 
@@ -4343,5 +4358,39 @@ public class WifiServiceImpl extends BaseWifiService {
     public String doDriverCmd(String command)
     {
         return mClientModeImpl.doDriverCmd(mClientModeImplChannel, command);
+    }
+
+    /**
+     * PICO: record which package last turned Wi-Fi on or off, as "<package>:enable" or
+     * "<package>:disable" in Settings.Global pvr_wifi_state_changed_by_who.
+     */
+    private void savePackageControlWifiSate(String packageName, boolean enable) {
+        mWifiInjector.getClientModeImplHandler().post(() -> {
+            if (mFacade != null) {
+                mFacade.setStringSetting(mContext, PVR_WIFI_STATE_CHANGED_BY_WHO,
+                        packageName + ":" + (enable ? "enable" : "disable"));
+            }
+        });
+    }
+
+    /**
+     * PICO: turn Wi-Fi off when the customer switch wifi_feature_for_customer_enabled is
+     * cleared while Wi-Fi is on or turning on.
+     */
+    private void registerForCustomerWifiFeatureModeChange() {
+        ContentObserver contentObserver = new ContentObserver(null) {
+            @Override
+            public void onChange(boolean selfChange) {
+                if (!mSettingsStore.isWifiFeatureEnabledForCustomer()) {
+                    if (getWifiEnabledState() == WifiManager.WIFI_STATE_ENABLED
+                            || getWifiEnabledState() == WifiManager.WIFI_STATE_ENABLING) {
+                        setWifiEnabled(mContext.getPackageName(), false);
+                    }
+                }
+            }
+        };
+        mFrameworkFacade.registerContentObserver(mContext,
+                Settings.Global.getUriFor(WifiSettingsStore.WIFI_FEATURE_FOR_CUSTOMER_ENABLED),
+                false, contentObserver);
     }
 }

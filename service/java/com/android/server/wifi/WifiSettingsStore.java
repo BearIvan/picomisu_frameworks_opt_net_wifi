@@ -34,6 +34,9 @@ public class WifiSettingsStore {
     /* Wifi disabled due to airplane mode on */
     private static final int WIFI_DISABLED_AIRPLANE_ON          = 3;
 
+    /* PICO: Settings.Global switch letting a customer disable the Wi-Fi feature (default 1) */
+    static final String WIFI_FEATURE_FOR_CUSTOMER_ENABLED = "wifi_feature_for_customer_enabled";
+
     /* Persisted state that tracks the wifi & airplane interaction from settings */
     private int mPersistWifiState = WIFI_DISABLED;
     /* Tracks current airplane mode state */
@@ -224,5 +227,13 @@ public class WifiSettingsStore {
         return Settings.Global.getInt(mContext.getContentResolver(),
                 Settings.Global.WIFI_SCAN_ALWAYS_AVAILABLE,
                 0) == 1;
+    }
+
+    /**
+     * PICO: whether the customer Wi-Fi feature switch allows Wi-Fi at all.
+     */
+    boolean isWifiFeatureEnabledForCustomer() {
+        return Settings.Global.getInt(mContext.getContentResolver(),
+                WIFI_FEATURE_FOR_CUSTOMER_ENABLED, 1) == 1;
     }
 }
