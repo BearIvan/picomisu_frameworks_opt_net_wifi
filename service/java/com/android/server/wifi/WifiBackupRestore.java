@@ -433,6 +433,12 @@ public class WifiBackupRestore {
          */
         public static final String SUPPLICANT_KEY_SSID = WifiConfiguration.ssidVarName;
         public static final String SUPPLICANT_KEY_HIDDEN = WifiConfiguration.hiddenSSIDVarName;
+        // PICO WifiConfiguration fields.
+        public static final String SUPPLICANT_KEY_SUCCESSCONNECT =
+                WifiConfiguration.successConnectVarName;
+        public static final String SUPPLICANT_KEY_NEEDLOGIN = WifiConfiguration.needLoginVarName;
+        public static final String SUPPLICANT_KEY_AUTOCONNECT =
+                WifiConfiguration.autoConnectVarName;
         public static final String SUPPLICANT_KEY_KEY_MGMT = WifiConfiguration.KeyMgmt.varName;
         public static final String SUPPLICANT_KEY_CLIENT_CERT =
                 WifiEnterpriseConfig.CLIENT_CERT_KEY;
@@ -502,6 +508,9 @@ public class WifiBackupRestore {
         static class SupplicantNetwork {
             private String mParsedSSIDLine;
             private String mParsedHiddenLine;
+            private String mSuccessConnectLine;
+            private String mNeedLoginLine;
+            private String mAutoConnectLine;
             private String mParsedKeyMgmtLine;
             private String mParsedPskLine;
             private String[] mParsedWepKeyLines = new String[4];
@@ -544,6 +553,12 @@ public class WifiBackupRestore {
                     mParsedSSIDLine = line;
                 } else if (line.startsWith(SUPPLICANT_KEY_HIDDEN + "=")) {
                     mParsedHiddenLine = line;
+                } else if (line.startsWith(SUPPLICANT_KEY_SUCCESSCONNECT + "=")) {
+                    mSuccessConnectLine = line;
+                } else if (line.startsWith(SUPPLICANT_KEY_NEEDLOGIN + "=")) {
+                    mNeedLoginLine = line;
+                } else if (line.startsWith(SUPPLICANT_KEY_AUTOCONNECT + "=")) {
+                    mAutoConnectLine = line;
                 } else if (line.startsWith(SUPPLICANT_KEY_KEY_MGMT + "=")) {
                     mParsedKeyMgmtLine = line;
                     if (line.contains("EAP")) {
@@ -590,6 +605,21 @@ public class WifiBackupRestore {
                     configuration.hiddenSSID =
                             Integer.parseInt(mParsedHiddenLine.substring(
                                     mParsedHiddenLine.indexOf('=') + 1)) != 0;
+                }
+                if (mSuccessConnectLine != null) {
+                    configuration.successConnect =
+                            Integer.parseInt(mSuccessConnectLine.substring(
+                                    mSuccessConnectLine.indexOf('=') + 1)) != 0;
+                }
+                if (mNeedLoginLine != null) {
+                    configuration.needLogin =
+                            Integer.parseInt(mNeedLoginLine.substring(
+                                    mNeedLoginLine.indexOf('=') + 1)) != 0;
+                }
+                if (mAutoConnectLine != null) {
+                    configuration.autoConnect =
+                            Integer.parseInt(mAutoConnectLine.substring(
+                                    mAutoConnectLine.indexOf('=') + 1)) != 0;
                 }
                 if (mParsedKeyMgmtLine == null) {
                     // no key_mgmt line specified; this is defined as equivalent to

@@ -351,6 +351,10 @@ public class XmlUtil {
         public static final String XML_TAG_RANDOMIZED_MAC_ADDRESS = "RandomizedMacAddress";
         public static final String XML_TAG_MAC_RANDOMIZATION_SETTING = "MacRandomizationSetting";
         public static final String XML_TAG_SHARE_THIS_AP = "ShareThisAp";
+        // PICO WifiConfiguration fields (successConnect, needLogin, autoConnect).
+        public static final String XML_TAG_SUCCESS_CONNECT = "SuccessConnect";
+        public static final String XML_TAG_NEED_LOGIN = "NeedLogin";
+        public static final String XML_TAG_AUTO_CONNECT = "AutoConnect";
 
         public static final String XML_TAG_DPP_CONNECTOR = "DppConnector";
         public static final String XML_TAG_DPP_NETACCESSKEY = "DppNetAccessKey";
@@ -434,6 +438,9 @@ public class XmlUtil {
             writeWepKeysToXml(out, configuration.wepKeys);
             XmlUtil.writeNextValue(out, XML_TAG_WEP_TX_KEY_INDEX, configuration.wepTxKeyIndex);
             XmlUtil.writeNextValue(out, XML_TAG_HIDDEN_SSID, configuration.hiddenSSID);
+            XmlUtil.writeNextValue(out, XML_TAG_SUCCESS_CONNECT, configuration.successConnect);
+            XmlUtil.writeNextValue(out, XML_TAG_NEED_LOGIN, configuration.needLogin);
+            XmlUtil.writeNextValue(out, XML_TAG_AUTO_CONNECT, configuration.autoConnect);
             XmlUtil.writeNextValue(out, XML_TAG_REQUIRE_PMF, configuration.requirePMF);
             XmlUtil.writeNextValue(
                     out, XML_TAG_ALLOWED_KEY_MGMT,
@@ -605,6 +612,15 @@ public class XmlUtil {
                             break;
                         case XML_TAG_HIDDEN_SSID:
                             configuration.hiddenSSID = (boolean) value;
+                            break;
+                        case XML_TAG_SUCCESS_CONNECT:
+                            configuration.successConnect = (boolean) value;
+                            break;
+                        case XML_TAG_NEED_LOGIN:
+                            configuration.needLogin = (boolean) value;
+                            break;
+                        case XML_TAG_AUTO_CONNECT:
+                            configuration.autoConnect = (boolean) value;
                             break;
                         case XML_TAG_REQUIRE_PMF:
                             configuration.requirePMF = (boolean) value;

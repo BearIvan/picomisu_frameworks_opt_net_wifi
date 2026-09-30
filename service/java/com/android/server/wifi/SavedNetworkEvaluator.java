@@ -20,6 +20,7 @@ import android.annotation.NonNull;
 import android.content.Context;
 import android.net.wifi.ScanResult;
 import android.net.wifi.WifiConfiguration;
+import android.os.SystemProperties;
 import android.telephony.SubscriptionManager;
 import android.util.LocalLog;
 import android.util.Log;
@@ -37,6 +38,13 @@ import java.util.List;
  */
 public class SavedNetworkEvaluator implements WifiNetworkSelector.NetworkEvaluator {
     private static final String NAME = "SavedNetworkEvaluator";
+    /**
+     * PICO: 1 keeps auto-connecting to saved networks that are disabled only for having no
+     * internet access (temporary or permanent).
+     */
+    private static final String PROP_AUTO_CONNECT_NO_INTERNET_AP = "persist.pvr.wifi.auto_connect";
+    private static final int PROP_AUTO_CONNECT_NO_INTERNET_AP_DISABLED = 0;
+    private static final int PROP_AUTO_CONNECT_NO_INTERNET_AP_ENABLEED = 1;
     private final WifiConfigManager mWifiConfigManager;
     private final Clock mClock;
     private final LocalLog mLocalLog;
@@ -235,7 +243,7 @@ public class SavedNetworkEvaluator implements WifiNetworkSelector.NetworkEvaluat
             // TODO (b/112196799): another side effect
             status.setSeenInLastQualifiedNetworkSelection(true);
 
-            if (!status.isNetworkEnabled()) {
+            if (!isAutoConnectBaseEnableState(status)) {
                 continue;
             } else if (network.BSSID != null &&  !network.BSSID.equals("any")
                     && !network.BSSID.equals(scanResult.BSSID)) {
@@ -248,6 +256,12 @@ public class SavedNetworkEvaluator implements WifiNetworkSelector.NetworkEvaluat
             } else if (TelephonyUtil.isSimConfig(network)
                     && !TelephonyUtil.isSimPresent(mSubscriptionManager)) {
                 // Don't select if security type is EAP SIM/AKA/AKA' when SIM is not present.
+                continue;
+            } else if (network.needLogin && !network.autoConnect) {
+                // PICO: a network behind a login page is auto-joined only when the user
+                // allowed it.
+                localLog("attemptAutoJoin skip candidate as AP is not autoConnect network = "
+                        + network.SSID);
                 continue;
             }
 
@@ -319,4 +333,25 @@ public class SavedNetworkEvaluator implements WifiNetworkSelector.NetworkEvaluat
 
          return false;
      }
+
+    /**
+     * PICO: a saved network is an auto-connect candidate when it is enabled, or when it is
+     * disabled only for having no internet access and persist.pvr.wifi.auto_connect is 1.
+     */
+    private boolean isAutoConnectBaseEnableState(
+            WifiConfiguration.NetworkSelectionStatus status) {
+        if (status.isNetworkEnabled()) {
+            return true;
+        }
+        int disableReason = status.getNetworkSelectionDisableReason();
+        if (disableReason != WifiConfiguration.NetworkSelectionStatus
+                        .DISABLED_NO_INTERNET_TEMPORARY
+                && disableReason != WifiConfiguration.NetworkSelectionStatus
+                        .DISABLED_NO_INTERNET_PERMANENT) {
+            return false;
+        }
+        int autoConnectNoInternet = SystemProperties.getInt(PROP_AUTO_CONNECT_NO_INTERNET_AP,
+                PROP_AUTO_CONNECT_NO_INTERNET_AP_DISABLED);
+        return autoConnectNoInternet == PROP_AUTO_CONNECT_NO_INTERNET_AP_ENABLEED;
+    }
 }

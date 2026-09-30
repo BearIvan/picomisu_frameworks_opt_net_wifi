@@ -968,6 +968,9 @@ public class WifiConfigManager {
             internalConfig.BSSID = externalConfig.BSSID.toLowerCase();
         }
         internalConfig.hiddenSSID = externalConfig.hiddenSSID;
+        // PICO: captive-portal login and auto-connect choice of the network.
+        internalConfig.needLogin = externalConfig.needLogin;
+        internalConfig.autoConnect = externalConfig.autoConnect;
         internalConfig.requirePMF = externalConfig.requirePMF;
 
         if (externalConfig.preSharedKey != null
@@ -1948,6 +1951,7 @@ public class WifiConfigManager {
         if (config == null) {
             return false;
         }
+        saveConnectedConfig(config);
         config.lastConnected = mClock.getWallClockMillis();
         config.numAssociation++;
         config.getNetworkSelectionStatus().clearDisableReasonCounter();
@@ -1955,6 +1959,20 @@ public class WifiConfigManager {
         setNetworkStatus(config, WifiConfiguration.Status.CURRENT);
         saveToStore(false);
         return true;
+    }
+
+    /**
+     * PICO: mark the network as successfully connected the first time it connects and write
+     * the saved networks to the store at once (forced write) for persisted networks.
+     */
+    private void saveConnectedConfig(WifiConfiguration config) {
+        if (!config.successConnect) {
+            config.successConnect = true;
+            mConfiguredNetworks.put(config);
+            if (!config.ephemeral && !config.isPasspoint()) {
+                saveToStore(true);
+            }
+        }
     }
 
     /**

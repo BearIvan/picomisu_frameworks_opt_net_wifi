@@ -102,6 +102,9 @@ class WifiBackupDataV1Parser implements WifiBackupDataParser {
                 WifiConfigurationXmlUtil.XML_TAG_WEP_KEYS,
                 WifiConfigurationXmlUtil.XML_TAG_WEP_TX_KEY_INDEX,
                 WifiConfigurationXmlUtil.XML_TAG_HIDDEN_SSID,
+                WifiConfigurationXmlUtil.XML_TAG_SUCCESS_CONNECT,
+                WifiConfigurationXmlUtil.XML_TAG_NEED_LOGIN,
+                WifiConfigurationXmlUtil.XML_TAG_AUTO_CONNECT,
                 WifiConfigurationXmlUtil.XML_TAG_REQUIRE_PMF,
                 WifiConfigurationXmlUtil.XML_TAG_ALLOWED_KEY_MGMT,
                 WifiConfigurationXmlUtil.XML_TAG_ALLOWED_PROTOCOLS,
@@ -314,6 +317,17 @@ class WifiBackupDataV1Parser implements WifiBackupDataParser {
                     break;
                 case WifiConfigurationXmlUtil.XML_TAG_HIDDEN_SSID:
                     configuration.hiddenSSID = (boolean) value;
+                    break;
+                case WifiConfigurationXmlUtil.XML_TAG_SUCCESS_CONNECT:
+                    configuration.successConnect = (boolean) value;
+                    break;
+                case WifiConfigurationXmlUtil.XML_TAG_NEED_LOGIN:
+                    configuration.needLogin = (boolean) value;
+                    break;
+                case WifiConfigurationXmlUtil.XML_TAG_AUTO_CONNECT:
+                    // Factory behaviour: the restored AutoConnect value is stored in
+                    // needLogin (autoConnect keeps its default, true).
+                    configuration.needLogin = (boolean) value;
                     break;
                 case WifiConfigurationXmlUtil.XML_TAG_REQUIRE_PMF:
                     configuration.requirePMF = (boolean) value;
