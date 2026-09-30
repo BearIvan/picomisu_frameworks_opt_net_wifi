@@ -20,6 +20,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.wifi.WifiManager;
 import android.os.UserHandle;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -37,6 +38,8 @@ import java.util.Locale;
  */
 public class WifiCountryCode {
     private static final String TAG = "WifiCountryCode";
+    // PICO: Settings.Global key where the PICO setup wizard saves the user's country code.
+    private static final String USER_SETTINGS_INITIALIZED = "user_settings_initialized";
     private final WifiNative mWifiNative;
     private boolean DBG = false;
     private boolean mReady = false;
@@ -74,6 +77,8 @@ public class WifiCountryCode {
                 mRevertCountryCodeOnCellularLoss = false;
             }
         }
+
+        setPersistentWifiCountryCode();
 
         Log.d(TAG, "mDefaultCountryCode " + mDefaultCountryCode
                 + " mRevertCountryCodeOnCellularLoss " + mRevertCountryCodeOnCellularLoss);
@@ -266,6 +271,22 @@ public class WifiCountryCode {
         }
         Log.d(TAG, "Failed to set country code to: " + country);
         return false;
+    }
+
+    /**
+     * PICO: the PICO setup wizard stores the chosen country code in Settings.Global
+     * user_settings_initialized; when set it replaces the OEM default country code.
+     */
+    private void setPersistentWifiCountryCode() {
+        // The factory code has no null check; the context-less constructor is test-only.
+        if (mContext == null) {
+            return;
+        }
+        String persistentWifiCountryCode = Settings.Global.getString(
+                mContext.getContentResolver(), USER_SETTINGS_INITIALIZED);
+        if (!TextUtils.isEmpty(persistentWifiCountryCode)) {
+            mDefaultCountryCode = persistentWifiCountryCode.toUpperCase(Locale.US);
+        }
     }
 }
 
