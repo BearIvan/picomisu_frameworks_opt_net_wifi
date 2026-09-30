@@ -634,6 +634,8 @@ public class WifiConfigManager {
                 && targetUid != configuration.creatorUid) {
             maskRandomizedMacAddressInWifiConfiguration(network);
         }
+        // PICO: follow persist.pxr.macrandom, re-read at each call.
+        mConnectedMacRandomzationSupported = ClientModeImpl.isPxrMacRandomizationEnabled();
         if (!mConnectedMacRandomzationSupported) {
             network.macRandomizationSetting = WifiConfiguration.RANDOMIZATION_NONE;
         }
