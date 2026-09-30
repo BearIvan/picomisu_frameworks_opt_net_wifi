@@ -28,6 +28,7 @@ import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiConfiguration;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.ArrayMap;
 import android.util.ArraySet;
@@ -120,6 +121,20 @@ public class WifiNetworkSelector {
     private final Map<String, WifiCandidates.CandidateScorer> mCandidateScorers = new ArrayMap<>();
     private boolean mIsEnhancedOpenSupportedInitialized = false;
     private boolean mIsEnhancedOpenSupported;
+
+    // PICO: prefer a 5 GHz BSSID of the current network when the device sits on 2.4 GHz (or
+    // on a weak 5 GHz BSSID) and either persist.preferred.5g.enabled is 1 or the swift
+    // (Bluetooth controller) link asked for 5 GHz.
+    private static final String PREFERRED_5G_ENABLED_NAME = "persist.preferred.5g.enabled";
+    private static final int PREFERRED_5G_DISABLE = 0;
+    private static final int PREFERRED_5G_ENABLED = 1;
+    private static final String ROMING_5G_BAD_RSSI_PROP_NAME = "persist.roming.bad.rssi";
+    private static final int ROMING_5G_BAD_RSSI = -70;
+    private static final String ROMING_5G_RSSI_THRESHOLD_PROP_NAME =
+            "persist.roming.threshold.rssi";
+    private static final int ROMING_5G_RSSI_THRESHOLD = -70;
+    private boolean mIsSwiftConnected;
+    private boolean mIsSwitchedForSwift;
 
     /**
      * WiFi Network Selector supports various categories of networks. Each category
@@ -686,6 +701,27 @@ public class WifiNetworkSelector {
     }
 
     /**
+     * PICO: whether the last selection was the swift 5 GHz switch of the current network.
+     */
+    public boolean isSwitchedForSwift() {
+        return mIsSwitchedForSwift;
+    }
+
+    /**
+     * PICO: clear the swift 5 GHz switch once WifiConnectivityManager acted on it.
+     */
+    public void recoverySwitchedForSwift() {
+        mIsSwitchedForSwift = false;
+    }
+
+    /**
+     * PICO: record whether the swift (Bluetooth controller) link wants the station on 5 GHz.
+     */
+    public void setSwiftConnected(boolean connected) {
+        mIsSwiftConnected = connected;
+    }
+
+    /**
      * Select the best network from the ones in range.
      *
      * @param scanDetails    List of ScanDetail for all the APs in range
@@ -709,6 +745,34 @@ public class WifiNetworkSelector {
 
         WifiConfiguration currentNetwork =
                 mWifiConfigManager.getConfiguredNetwork(wifiInfo.getNetworkId());
+
+        int preferred5gEnabled = SystemProperties.getInt(PREFERRED_5G_ENABLED_NAME,
+                PREFERRED_5G_DISABLE);
+        // The factory code has no null check here; wifiInfo only reports a 2.4/5 GHz band
+        // while associated, so currentNetwork is normally set, but keep system_server safe.
+        if ((preferred5gEnabled == PREFERRED_5G_ENABLED || mIsSwiftConnected)
+                && currentNetwork != null) {
+            int bad5gRssi = SystemProperties.getInt(ROMING_5G_BAD_RSSI_PROP_NAME,
+                    ROMING_5G_BAD_RSSI);
+            int rssiThreshold = SystemProperties.getInt(ROMING_5G_RSSI_THRESHOLD_PROP_NAME,
+                    ROMING_5G_RSSI_THRESHOLD);
+            if (wifiInfo.is24GHz() || (wifiInfo.is5GHz() && wifiInfo.getRssi() < bad5gRssi)) {
+                for (ScanDetail detail : scanDetails) {
+                    ScanResult result = detail.getScanResult();
+                    if (result.is5GHz() && result.level > rssiThreshold && result.SSID != null
+                            && result.SSID.equals(
+                                    WifiInfo.removeDoubleQuotes(wifiInfo.getSSID()))) {
+                        currentNetwork.getNetworkSelectionStatus().setCandidate(result);
+                        currentNetwork.getNetworkSelectionStatus()
+                                .setSeenInLastQualifiedNetworkSelection(true);
+                        mIsSwitchedForSwift = true;
+                        Log.i(TAG, "select network:" + currentNetwork.SSID
+                                + " scanResult:" + result);
+                        return currentNetwork;
+                    }
+                }
+            }
+        }
 
         // Always get the current BSSID from WifiInfo in case that firmware initiated
         // roaming happened.

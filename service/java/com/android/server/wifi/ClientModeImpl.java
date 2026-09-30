@@ -330,6 +330,15 @@ public class ClientModeImpl extends StateMachine {
     public static final String SUPPLICANT_BSSID_ANY = "any";
 
     /**
+     * Sent by the PICO Bluetooth peripheral adapter when the swift (Bluetooth controller)
+     * link needs, or no longer needs, the Wi-Fi station on 5 GHz.
+     */
+    public static final String ACTION_5G_WIFI_MODE_NECESSARY_STATE_CHANGED =
+            "com.pvr.btperipheral.adapter.action.5G_WIFI_MODE_NECESSARY_STATE_CHANGED";
+    /** 1 when the swift link is connected, 0 otherwise. */
+    public static final String EXTRA_STATE_SWIFT = "com.pvr.btperipheral.adapter.extra.STATE";
+
+    /**
      * The link properties of the wifi interface.
      * Do not modify this directly; use updateLinkProperties instead.
      */
@@ -965,16 +974,22 @@ public class ClientModeImpl extends StateMachine {
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_SCREEN_ON);
         filter.addAction(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(ACTION_5G_WIFI_MODE_NECESSARY_STATE_CHANGED);
         mContext.registerReceiver(
                 new BroadcastReceiver() {
                     @Override
                     public void onReceive(Context context, Intent intent) {
                         String action = intent.getAction();
+                        Log.i(TAG, "receive action:" + action.toString());
 
                         if (action.equals(Intent.ACTION_SCREEN_ON)) {
                             sendMessage(CMD_SCREEN_STATE_CHANGED, 1);
                         } else if (action.equals(Intent.ACTION_SCREEN_OFF)) {
                             sendMessage(CMD_SCREEN_STATE_CHANGED, 0);
+                        } else if (ACTION_5G_WIFI_MODE_NECESSARY_STATE_CHANGED.equals(action)) {
+                            int state = intent.getIntExtra(EXTRA_STATE_SWIFT, 0);
+                            Log.i(TAG, "get state=" + state);
+                            mWifiConnectivityManager.handleSwiftStateChanaged(state == 1);
                         }
                     }
                 }, filter);

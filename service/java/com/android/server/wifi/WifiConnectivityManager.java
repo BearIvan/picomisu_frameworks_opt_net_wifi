@@ -180,6 +180,10 @@ public class WifiConnectivityManager {
     private boolean mUseSingleRadioChainScanResults = true;
     private int mFullScanMaxTxRate;
     private int mFullScanMaxRxRate;
+    private final int mStayOnNetworkMinimumTxRate;
+    private final int mStayOnNetworkMinimumRxRate;
+    // PICO: the swift (Bluetooth controller) link is connected and wants the station on 5 GHz.
+    private boolean mSiftConnected;
 
     // PNO settings
     private int mCurrentConnectionBonus;
@@ -653,6 +657,10 @@ public class WifiConnectivityManager {
                 R.integer.config_wifi_framework_max_tx_rate_for_full_scan);
         mFullScanMaxRxRate = context.getResources().getInteger(
                 R.integer.config_wifi_framework_max_rx_rate_for_full_scan);
+        mStayOnNetworkMinimumTxRate = context.getResources().getInteger(
+                R.integer.config_wifi_framework_min_tx_rate_for_staying_on_network);
+        mStayOnNetworkMinimumRxRate = context.getResources().getInteger(
+                R.integer.config_wifi_framework_min_rx_rate_for_staying_on_network);
 
         mPnoScanIntervalMs = MOVING_PNO_SCAN_INTERVAL_MS;
 
@@ -733,8 +741,10 @@ public class WifiConnectivityManager {
         // BSSID. mWifiInfo.mBSSID tracks the currently connected BSSID. This is checked just
         // in case the firmware automatically roamed to a BSSID different from what
         // WifiNetworkSelector selected.
+        // PICO: a swift 5 GHz switch may retry the BSSID of the last connection attempt.
         if (targetBssid != null
-                && (targetBssid.equals(mLastConnectionAttemptBssid)
+                && ((targetBssid.equals(mLastConnectionAttemptBssid)
+                        && !mNetworkSelector.isSwitchedForSwift())
                     || targetBssid.equals(mWifiInfo.getBSSID()))
                 && SupplicantState.isConnecting(mWifiInfo.getSupplicantState())) {
             localLog("connectToNetwork: Either already connected "
@@ -764,6 +774,15 @@ public class WifiConnectivityManager {
                 .getConfiguredNetwork(mWifiInfo.getNetworkId());
         String currentAssociationId = (currentConnectedNetwork == null) ? "Disconnected" :
                 (mWifiInfo.getSSID() + " : " + mWifiInfo.getBSSID());
+
+        // PICO: the network selector picked a 5 GHz BSSID of the current network for the
+        // swift link; roam to it directly, whatever the firmware roaming support.
+        if (mNetworkSelector.isSwitchedForSwift()) {
+            Log.i(TAG, "For switf, roaming " + targetBssid);
+            mStateMachine.startRoamToNetwork(candidate.networkId, scanResultCandidate);
+            mNetworkSelector.recoverySwitchedForSwift();
+            return;
+        }
 
         if (currentConnectedNetwork != null
                 && (currentConnectedNetwork.networkId == candidate.networkId
@@ -882,6 +901,16 @@ public class WifiConnectivityManager {
                 localLog("No full band scan due to ongoing traffic");
                 isFullBandScan = false;
             }
+        }
+
+        // PICO: skip the periodic scan while the current network is good enough, unless the
+        // swift link is looking for a 5 GHz BSSID.
+        if (isCurrentNetworkSufficient(mWifiInfo)) {
+            isScanNeeded = false;
+        }
+        if (mSiftConnected) {
+            isScanNeeded = true;
+            isFullBandScan = true;
         }
 
         if (isScanNeeded) {
@@ -1181,6 +1210,19 @@ public class WifiConnectivityManager {
     }
 
     /**
+     * PICO: handler for the swift (Bluetooth controller) 5 GHz Wi-Fi mode broadcast.
+     * While the swift link is connected the network selector prefers a 5 GHz BSSID of the
+     * current network and connectivity scans run immediately.
+     */
+    public void handleSwiftStateChanaged(boolean swiftConnected) {
+        mSiftConnected = swiftConnected;
+        if (mNetworkSelector != null) {
+            mNetworkSelector.setSwiftConnected(swiftConnected);
+            startConnectivityScan(SCAN_IMMEDIATELY);
+        }
+    }
+
+    /**
      * Save current miracast mode, it will be used to ignore
      * connectivity scan during the time when miracast is enabled.
      */
@@ -1215,7 +1257,9 @@ public class WifiConnectivityManager {
 
         // Reset BSSID of last connection attempt and kick off
         // the watchdog timer if entering disconnected state.
-        if (mWifiState == WIFI_STATE_DISCONNECTED) {
+        // PICO: do the same on connect while the swift link wants 5 GHz.
+        if (mWifiState == WIFI_STATE_DISCONNECTED
+                || (mWifiState == WIFI_STATE_CONNECTED && mSiftConnected)) {
             mLastConnectionAttemptBssid = null;
             scheduleWatchdogTimer();
             startConnectivityScan(SCAN_IMMEDIATELY);
@@ -1672,5 +1716,50 @@ public class WifiConnectivityManager {
         }
 
         return whitelistedSsids;
+    }
+
+    /**
+     * PICO: decide whether the current network is good enough to skip the periodic single
+     * scan (same criteria as WifiNetworkSelector#isCurrentNetworkSufficient, without the
+     * scan results).
+     */
+    private boolean isCurrentNetworkSufficient(WifiInfo wifiInfo) {
+        if (wifiInfo.getSupplicantState() != SupplicantState.COMPLETED) {
+            return false;
+        }
+
+        int currentRssi = wifiInfo.getRssi();
+        boolean hasQualifiedRssi = currentRssi
+                > mScoringParams.getSufficientRssi(wifiInfo.getFrequency());
+        boolean hasActiveStream = (wifiInfo.txSuccessRate > mStayOnNetworkMinimumTxRate)
+                || (wifiInfo.rxSuccessRate > mStayOnNetworkMinimumRxRate);
+        if (hasQualifiedRssi && hasActiveStream) {
+            Log.d(TAG, "Stay on current network because of good RSSI and ongoing traffic, "
+                    + "skip scan!");
+            return true;
+        }
+        WifiConfiguration network =
+                mConfigManager.getConfiguredNetwork(wifiInfo.getNetworkId());
+
+        if (network == null) {
+            return false;
+        }
+
+        if (mConfigManager.getLastSelectedNetwork() == network.networkId
+                && (mClock.getElapsedSinceBootMillis()
+                    - mConfigManager.getLastSelectedTimeStamp())
+                <= WifiNetworkSelector.LAST_USER_SELECTION_SUFFICIENT_MS) {
+            Log.d(TAG, "Current network is recently user-selected, skip scan!");
+            return true;
+        }
+
+        if (!wifiInfo.is5GHz() || !hasQualifiedRssi
+                || WifiConfigurationUtil.isConfigForOpenNetwork(network)
+                || (!network.validatedInternetAccess && !network.noInternetAccessExpected)) {
+            return false;
+        }
+
+        Log.d(TAG, "Current network is sufficient, skip scan!");
+        return true;
     }
 }
