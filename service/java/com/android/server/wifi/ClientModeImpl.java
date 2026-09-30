@@ -88,6 +88,7 @@ import android.os.Messenger;
 import android.os.PowerManager;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
@@ -129,6 +130,8 @@ import com.android.server.wifi.util.TelephonyUtil.SimAuthRequestData;
 import com.android.server.wifi.util.TelephonyUtil.SimAuthResponseData;
 import com.android.server.wifi.util.WifiPermissionsUtil;
 import com.android.server.wifi.util.WifiPermissionsWrapper;
+import com.pxr.net.NetworkPxrAdapter;
+import com.pxr.net.PxrWifiConnectionInfo;
 import com.android.server.wifi.WifiNative.WifiGenerationStatus;
 
 import java.io.BufferedReader;
@@ -1421,6 +1424,10 @@ public class ClientModeImpl extends StateMachine {
 
     private WifiLinkLayerStats mLastLinkLayerStats;
     private long mLastLinkLayerStatsUpdate = 0;
+
+    // PICO: link quality reporting to the PXR network manager (NetworkPxrAdapter).
+    private NetworkPxrAdapter mNetworkPxrAdapter = null;
+    private WifiNative.SignalPollResult mSignalPollResult = null;
 
     String reportOnTime() {
         long now = mClock.getWallClockMillis();
@@ -2890,6 +2897,8 @@ public class ClientModeImpl extends StateMachine {
         int newTxLinkSpeed = pollResult.txBitrate;
         int newFrequency = pollResult.associationFrequency;
         int newRxLinkSpeed = pollResult.rxBitrate;
+        // PICO: kept for the link quality report of the next RSSI poll.
+        mSignalPollResult = pollResult;
 
         if (mVerboseLoggingEnabled) {
             logd("fetchRssiLinkSpeedAndFrequencyNative rssi=" + newRssi
@@ -5753,6 +5762,21 @@ public class ClientModeImpl extends StateMachine {
                                 mLastStatusDataStall = WifiIsUnusableEvent.TYPE_UNKNOWN;
                             }
                         }
+                        // PICO: report the link quality to the PXR network manager.
+                        try {
+                            if (mNetworkPxrAdapter == null) {
+                                mNetworkPxrAdapter = NetworkPxrAdapter.getInstance(mContext);
+                            }
+                            if (mNetworkPxrAdapter != null && stats != null
+                                    && mSignalPollResult != null) {
+                                PxrWifiConnectionInfo pxrwifi = new PxrWifiConnectionInfo();
+                                updatePxrWifiLinkLayerStats(stats, pxrwifi);
+                                updatePxrSignalPollResult(mSignalPollResult, pxrwifi);
+                                mNetworkPxrAdapter.updateLinkLayerQuality(pxrwifi);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                         mWifiMetrics.incrementWifiLinkLayerUsageStats(stats);
                         mLastLinkLayerStats = stats;
                         mWifiScoreCard.noteSignalPoll(mWifiInfo);
@@ -5904,6 +5928,59 @@ public class ClientModeImpl extends StateMachine {
             // Send the update score to network agent.
             mWifiScoreReport.calculateAndReportScore(mWifiInfo, mNetworkAgent, mWifiMetrics);
             return stats;
+        }
+
+        /**
+         * PICO: copy the link layer statistics for NetworkPxrAdapter.
+         */
+        private void updatePxrWifiLinkLayerStats(WifiLinkLayerStats wllstats,
+                PxrWifiConnectionInfo pxrwifi) {
+            if (wllstats == null || pxrwifi == null) {
+                return;
+            }
+            pxrwifi.txmpdu_be = wllstats.txmpdu_be;
+            pxrwifi.txmpdu_bk = wllstats.txmpdu_bk;
+            pxrwifi.txmpdu_vi = wllstats.txmpdu_vi;
+            pxrwifi.txmpdu_vo = wllstats.txmpdu_vo;
+            pxrwifi.retries_be = wllstats.retries_be;
+            pxrwifi.retries_bk = wllstats.retries_bk;
+            pxrwifi.retries_vi = wllstats.retries_vi;
+            pxrwifi.retries_vo = wllstats.retries_vo;
+            pxrwifi.lostmpdu_be = wllstats.lostmpdu_be;
+            pxrwifi.lostmpdu_bk = wllstats.lostmpdu_bk;
+            pxrwifi.lostmpdu_vi = wllstats.lostmpdu_vi;
+            pxrwifi.lostmpdu_vo = wllstats.lostmpdu_vo;
+            pxrwifi.rxmpdu_be = wllstats.rxmpdu_be;
+            pxrwifi.rxmpdu_bk = wllstats.rxmpdu_bk;
+            pxrwifi.rxmpdu_vi = wllstats.rxmpdu_vi;
+            pxrwifi.rxmpdu_vo = wllstats.rxmpdu_vo;
+            pxrwifi.contention_atime_be = wllstats.contention_atime_be;
+            pxrwifi.contention_atime_bk = wllstats.contention_atime_bk;
+            pxrwifi.contention_atime_vi = wllstats.contention_atime_vi;
+            pxrwifi.contention_atime_vo = wllstats.contention_atime_vo;
+            WifiLinkLayerStats.ChannelStats statsMap =
+                    wllstats.channelStatsMap.get(mWifiInfo.getFrequency());
+            if (statsMap != null) {
+                pxrwifi.radioOnTimeMs = statsMap.radioOnTimeMs;
+                pxrwifi.ccaBusyTimeMs = statsMap.ccaBusyTimeMs;
+            }
+            pxrwifi.llstatTimeStamp = wllstats.timeStampInMs;
+        }
+
+        /**
+         * PICO: copy the extended signal poll result for NetworkPxrAdapter.
+         */
+        private void updatePxrSignalPollResult(WifiNative.SignalPollResult spres,
+                PxrWifiConnectionInfo pxrwifi) {
+            if (spres == null || pxrwifi == null) {
+                return;
+            }
+            pxrwifi.fcsError = spres.fcsError;
+            pxrwifi.txBytes = spres.txBytes;
+            pxrwifi.rxBytes = spres.rxBytes;
+            pxrwifi.txRateInfo = spres.txRateInfo;
+            pxrwifi.rxRateInfo = spres.rxRateInfo;
+            pxrwifi.signalPollTimeStamp = SystemClock.elapsedRealtime();
         }
     }
 

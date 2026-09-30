@@ -1443,6 +1443,18 @@ public class WifiNative {
         public int associationFrequency;
         //Last received packet bit rate in Mbps.
         public int rxBitrate;
+        // PICO extended station info, reported by the PICO wificond (9 values). They stay 0
+        // with a wificond that only reports the 4 standard values.
+        // Frames received with an FCS error.
+        public int fcsError;
+        // Bytes transmitted.
+        public int txBytes;
+        // Bytes received.
+        public int rxBytes;
+        // Transmission rate info.
+        public int txRateInfo;
+        // Receive rate info.
+        public int rxRateInfo;
     }
 
     /**

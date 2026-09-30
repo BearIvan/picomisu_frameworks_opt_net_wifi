@@ -78,6 +78,10 @@ public class WificondControl implements IBinder.DeathRecipient {
 
     private static final String TIMEOUT_ALARM_TAG = TAG + " Send Management Frame Timeout";
 
+    /* Number of signalPoll() values: AOSP/CAF wificond, and PICO wificond with extended info */
+    private static final int SIGNAL_POLL_RESULT_LENGTH_AOSP = 4;
+    private static final int SIGNAL_POLL_RESULT_LENGTH_PICO = 9;
+
     /* Get scan results for a single scan */
     public static final int SCAN_TYPE_SINGLE_SCAN = 0;
 
@@ -546,7 +550,12 @@ public class WificondControl implements IBinder.DeathRecipient {
         int[] resultArray;
         try {
             resultArray = iface.signalPoll();
-            if (resultArray == null || resultArray.length != 4) {
+            // The factory PICO wificond reports 9 values and the factory service only
+            // accepts 9. Also accept the 4 values of the CAF wificond this tree builds, so
+            // that RSSI polling keeps working; the PICO extended values then stay 0.
+            if (resultArray == null
+                    || (resultArray.length != SIGNAL_POLL_RESULT_LENGTH_PICO
+                        && resultArray.length != SIGNAL_POLL_RESULT_LENGTH_AOSP)) {
                 Log.e(TAG, "Invalid signal poll result from wificond");
                 return null;
             }
@@ -559,6 +568,13 @@ public class WificondControl implements IBinder.DeathRecipient {
         pollResult.txBitrate = resultArray[1];
         pollResult.associationFrequency = resultArray[2];
         pollResult.rxBitrate = resultArray[3];
+        if (resultArray.length == SIGNAL_POLL_RESULT_LENGTH_PICO) {
+            pollResult.fcsError = resultArray[4];
+            pollResult.txBytes = resultArray[5];
+            pollResult.rxBytes = resultArray[6];
+            pollResult.txRateInfo = resultArray[7];
+            pollResult.rxRateInfo = resultArray[8];
+        }
         return pollResult;
     }
 
