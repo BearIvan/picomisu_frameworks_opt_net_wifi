@@ -366,6 +366,11 @@ public class WifiApConfigStore {
         config.apBand = WifiConfiguration.AP_BAND_2GHZ;
         config.SSID = mContext.getResources().getString(
                 R.string.wifi_tether_configure_ssid_default) + "_" + getRandomIntForDefaultSsid();
+        // PICO: name the default hotspot after the product (sys.pxr.product.name), falling
+        // back to the overlay default SSID prefix.
+        String productName = SystemProperties.get("sys.pxr.product.name",
+                mContext.getResources().getString(R.string.wifi_tether_configure_ssid_default));
+        config.SSID = productName + "_" + getRandomIntForDefaultSsid();
         config.allowedKeyManagement.set(KeyMgmt.WPA2_PSK);
         String randomUUID = UUID.randomUUID().toString();
         //first 12 chars from xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx

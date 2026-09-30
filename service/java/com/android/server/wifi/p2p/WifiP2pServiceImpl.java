@@ -67,6 +67,7 @@ import android.os.Messenger;
 import android.os.Process;
 import android.os.RemoteException;
 import android.os.ServiceManager;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.provider.Settings;
@@ -3737,7 +3738,8 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
                 // default that has low likelihood of collision with a peer
                 String id = mFrameworkFacade.getSecureStringSetting(mContext,
                         Settings.Secure.ANDROID_ID);
-                return "Android_" + id.substring(0, 4);
+                // PICO: "<product name>_xxxx" or "Pico_xxxx" instead of "Android_xxxx".
+                return getNameFromProductModel(id.substring(0, 4));
             }
             return deviceName;
         }
@@ -4337,5 +4339,19 @@ public class WifiP2pServiceImpl extends IWifiP2pManager.Stub {
             mReqList = new SparseArray();
             mServList = new ArrayList<WifiP2pServiceInfo>();
         }
+    }
+
+    /**
+     * PICO: default Wi-Fi Direct device name, "<sys.pxr.product.name without whitespace>_"
+     * followed by |androidId| (the first four ANDROID_ID characters), or "Pico_<androidId>"
+     * when the product name is not set.
+     */
+    private String getNameFromProductModel(String androidId) {
+        String productName = SystemProperties.get("sys.pxr.product.name");
+        if (!TextUtils.isEmpty(productName)) {
+            String prefix = productName.replaceAll("\\s*", "") + "_";
+            return prefix + androidId;
+        }
+        return "Pico_" + androidId;
     }
 }
