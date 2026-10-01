@@ -28,6 +28,7 @@ import android.os.Build;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.util.EventLog;
 import android.util.Slog;
 
 import com.android.internal.annotations.GuardedBy;
@@ -411,6 +412,26 @@ public class WifiPermissionsUtil {
             }
         }
         return false;
+    }
+
+    /**
+     * Returns true if the |uid| holds NETWORK_SETTINGS permission or belongs to the
+     * current user.
+     */
+    public boolean doesUidBelongToCurrentUser(int uid) {
+        if (uid == android.os.Process.SYSTEM_UID
+                // UIDs with NETWORK_SETTINGS permission are always allowed since they are
+                // acting on behalf of the user.
+                || checkNetworkSettingsPermission(uid)) {
+            return true;
+        }
+        boolean isCurrentProfile = isCurrentProfile(uid);
+        if (!isCurrentProfile) {
+            // Fix for b/174749461
+            EventLog.writeEvent(0x534e4554, "174749461", -1,
+                    "Non foreground user trying to modify wifi configuration");
+        }
+        return isCurrentProfile;
     }
 
     private boolean noteAppOpAllowed(int op, String pkgName, int uid) {

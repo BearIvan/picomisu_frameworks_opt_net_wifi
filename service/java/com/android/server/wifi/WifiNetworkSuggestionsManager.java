@@ -566,6 +566,10 @@ public class WifiNetworkSuggestionsManager {
         if (mVerboseLoggingEnabled) {
             Log.v(TAG, "Adding " + networkSuggestions.size() + " networks from " + packageName);
         }
+        if (!mWifiPermissionsUtil.doesUidBelongToCurrentUser(uid)) {
+            Log.e(TAG, "UID " + uid + " not visible to the current user");
+            return WifiManager.STATUS_NETWORK_SUGGESTIONS_ERROR_INTERNAL;
+        }
         if (networkSuggestions.isEmpty()) {
             Log.w(TAG, "Empty list of network suggestions for " + packageName + ". Ignoring");
             return WifiManager.STATUS_NETWORK_SUGGESTIONS_SUCCESS;
@@ -677,6 +681,10 @@ public class WifiNetworkSuggestionsManager {
             List<WifiNetworkSuggestion> networkSuggestions, int uid, String packageName) {
         if (mVerboseLoggingEnabled) {
             Log.v(TAG, "Removing " + networkSuggestions.size() + " networks from " + packageName);
+        }
+        if (!mWifiPermissionsUtil.doesUidBelongToCurrentUser(uid)) {
+            Log.e(TAG, "UID " + uid + " not visible to the current user");
+            return WifiManager.STATUS_NETWORK_SUGGESTIONS_ERROR_INTERNAL;
         }
         PerAppInfo perAppInfo = mActiveNetworkSuggestionsPerApp.get(packageName);
         if (perAppInfo == null) {
