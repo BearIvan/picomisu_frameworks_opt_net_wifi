@@ -3302,6 +3302,10 @@ public class WifiServiceImpl extends BaseWifiService {
                         Binder.getCallingUid(), mClientModeImplChannel, Process.WIFI_UID);
                 if (networks != null) {
                     for (WifiConfiguration config : networks) {
+                        if (config.isEnterprise()) {
+                            mWifiInjector.getWifiKeyStore().removeKeys(
+                                    config.enterpriseConfig, true);
+                        }
                         removeNetwork(config.networkId, packageName);
                     }
                 }

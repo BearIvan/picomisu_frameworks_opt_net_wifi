@@ -504,6 +504,10 @@ public class WifiInjector {
         return mWifiConfigManager;
     }
 
+    public WifiKeyStore getWifiKeyStore() {
+        return mWifiKeyStore;
+    }
+
     public PasspointManager getPasspointManager() {
         return mPasspointManager;
     }
