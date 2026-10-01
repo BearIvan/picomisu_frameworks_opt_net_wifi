@@ -350,8 +350,6 @@ public class ClientModeImpl extends StateMachine {
      * factory vendor policy, which lets system_server set it.
      */
     private static final String PROP_NDS_WIFI_CONNECTED = "vendor.nds.wificonnected";
-    /** PICO: 1 enables connected MAC randomization, see isPxrMacRandomizationEnabled(). */
-    private static final String PROP_PXR_MAC_RANDOM = "persist.pxr.macrandom";
 
     /**
      * The link properties of the wifi interface.
@@ -1031,7 +1029,8 @@ public class ClientModeImpl extends StateMachine {
         mConnectedMacRandomzationSupported = mContext.getResources()
                 .getBoolean(R.bool.config_wifi_connected_mac_randomization_supported);
         // PICO: persist.pxr.macrandom overrides the overlay.
-        mConnectedMacRandomzationSupported = isPxrMacRandomizationEnabled();
+        mConnectedMacRandomzationSupported =
+                SystemProperties.getInt("persist.pxr.macrandom", 0) == 1;
         mWifiInfo.setEnableConnectedMacRandomization(mConnectedMacRandomzationSupported);
         mWifiMetrics.setIsMacRandomizationOn(mConnectedMacRandomzationSupported);
 
@@ -3839,17 +3838,9 @@ public class ClientModeImpl extends StateMachine {
      * @return boolean true if Connected MAC randomization is supported, false otherwise
      */
     public boolean isConnectedMacRandomizationEnabled() {
-        mConnectedMacRandomzationSupported = isPxrMacRandomizationEnabled();
+        mConnectedMacRandomzationSupported =
+                SystemProperties.getInt("persist.pxr.macrandom", 0) == 1;
         return mConnectedMacRandomzationSupported;
-    }
-
-    /**
-     * PICO: connected MAC randomization is switched by persist.pxr.macrandom (1 = on,
-     * default off) instead of config_wifi_connected_mac_randomization_supported. The
-     * property is re-read at each use, so it takes effect without a reboot.
-     */
-    public static boolean isPxrMacRandomizationEnabled() {
-        return SystemProperties.getInt(PROP_PXR_MAC_RANDOM, 0) == 1;
     }
 
     /**
@@ -4777,7 +4768,8 @@ public class ClientModeImpl extends StateMachine {
                     mWifiNative.enslaveClientInterfaces(false);
                     mIsFSTConnection = false;
 
-                    mConnectedMacRandomzationSupported = isPxrMacRandomizationEnabled();
+                    mConnectedMacRandomzationSupported =
+                            SystemProperties.getInt("persist.pxr.macrandom", 0) == 1;
                     if (config.macRandomizationSetting
                             == WifiConfiguration.RANDOMIZATION_PERSISTENT
                             && mConnectedMacRandomzationSupported) {
@@ -7445,7 +7437,8 @@ public class ClientModeImpl extends StateMachine {
         if (macAddress != null) {
             return macAddress.toString();
         }
-        mConnectedMacRandomzationSupported = isPxrMacRandomizationEnabled();
+        mConnectedMacRandomzationSupported =
+                SystemProperties.getInt("persist.pxr.macrandom", 0) == 1;
         if (!mConnectedMacRandomzationSupported) {
             return mWifiNative.getMacAddress(mInterfaceName);
         }

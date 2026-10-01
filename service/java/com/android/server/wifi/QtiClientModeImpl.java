@@ -825,7 +825,8 @@ public class QtiClientModeImpl extends StateMachine {
         mConnectedMacRandomzationSupported = mContext.getResources()
                 .getBoolean(R.bool.config_wifi_connected_mac_randomization_supported);
         // PICO: persist.pxr.macrandom overrides the overlay.
-        mConnectedMacRandomzationSupported = ClientModeImpl.isPxrMacRandomizationEnabled();
+        mConnectedMacRandomzationSupported =
+                SystemProperties.getInt("persist.pxr.macrandom", 0) == 1;
         mWifiInfo.setEnableConnectedMacRandomization(mConnectedMacRandomzationSupported);
 
         // TODO: UT: Lets not handle P2P operation/state from secondary station.
@@ -3144,7 +3145,8 @@ public class QtiClientModeImpl extends StateMachine {
      * @return boolean true if Connected MAC randomization is supported, false otherwise
      */
     public boolean isConnectedMacRandomizationEnabled() {
-        mConnectedMacRandomzationSupported = ClientModeImpl.isPxrMacRandomizationEnabled();
+        mConnectedMacRandomzationSupported =
+                SystemProperties.getInt("persist.pxr.macrandom", 0) == 1;
         return mConnectedMacRandomzationSupported;
     }
 
@@ -3923,7 +3925,7 @@ public class QtiClientModeImpl extends StateMachine {
                     reportConnectionAttemptStart(config, mTargetRoamBSSID,
                             WifiMetricsProto.ConnectionEvent.ROAM_UNRELATED);
                     mConnectedMacRandomzationSupported =
-                            ClientModeImpl.isPxrMacRandomizationEnabled();
+                            SystemProperties.getInt("persist.pxr.macrandom", 0) == 1;
                     if (config.macRandomizationSetting
                             == WifiConfiguration.RANDOMIZATION_PERSISTENT
                             && mConnectedMacRandomzationSupported) {

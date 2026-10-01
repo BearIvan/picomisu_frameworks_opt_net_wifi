@@ -40,6 +40,7 @@ import android.net.wifi.WifiScanner;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Process;
+import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.pico.utils.Features;
@@ -641,7 +642,8 @@ public class WifiConfigManager {
             maskRandomizedMacAddressInWifiConfiguration(network);
         }
         // PICO: follow persist.pxr.macrandom, re-read at each call.
-        mConnectedMacRandomzationSupported = ClientModeImpl.isPxrMacRandomizationEnabled();
+        mConnectedMacRandomzationSupported =
+                SystemProperties.getInt("persist.pxr.macrandom", 0) == 1;
         if (!mConnectedMacRandomzationSupported) {
             network.macRandomizationSetting = WifiConfiguration.RANDOMIZATION_NONE;
         }
